@@ -1,8 +1,12 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "agent/agent.hpp"
+#include "agent/environment_info.hpp"
+#include "agent/format.hpp"
+#include "agent/player_info.hpp"
 
 namespace {
 // NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
@@ -22,7 +26,7 @@ void SelectBuff(const thuai8_agent::Agent& agent) {
   const auto& self_info{agent.self_info()};
   const auto& available_buffs{agent.available_buffs()};
   for (auto buff : available_buffs) {
-    if (std::ranges::none_of(self_info.skills, [buff](const auto& skill) {
+    if (std::ranges::none_of(self_info.skills, [buff](auto skill) {
           return buff == skill.name;
         })) {
       agent.SelectBuff(buff);
@@ -37,9 +41,10 @@ void Loop(const thuai8_agent::Agent& agent) {
   // Here is an example of how to use the agent's functions
   const auto& self_info{agent.self_info()};
   const auto& opponent_info{agent.opponent_info()};
-
-  spdlog::debug("Self {}, Opponent {}", self_info.position,
-                opponent_info.position);
+  const auto& walls{agent.environment_info().walls};
+  const auto& fences{agent.environment_info().fences};
+  const auto& bullets{agent.environment_info().bullets};
+  const auto& game_statistics{agent.game_statistics()};
 
   agent.MoveForward();
   agent.MoveBackward();
@@ -47,11 +52,9 @@ void Loop(const thuai8_agent::Agent& agent) {
   agent.TurnCounterClockwise();
   agent.Attack();
 
-  for (const auto& skill : self_info.skills) {
-    if (skill.currentCoolDown == 0) {
-      agent.UseSkill(skill.name);
-      break;
-    }
+  if (!self_info.skills.empty() &&
+      self_info.skills.front().currentCoolDown == 0) {
+    agent.UseSkill(self_info.skills.front().name);
   }
 }
 // NOLINTEND(misc-use-internal-linkage)

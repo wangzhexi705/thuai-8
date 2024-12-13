@@ -20,7 +20,6 @@ namespace BattleCity
         {
             var Health = this.GetModel<HealthShow>().health[_tankId];
             Health.value = _health;
-            Debug.Log("Hello!");
         }
         
     }

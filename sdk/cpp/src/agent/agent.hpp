@@ -6,15 +6,16 @@
 #include <hv/EventLoop.h>
 #include <hv/WebSocketClient.h>
 
-#include <format>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "available_buffs.hpp"
 #include "environment_info.hpp"
 #include "game_statistics.hpp"
+#include "message.hpp"
 #include "player_info.hpp"
 
 namespace thuai8_agent {
@@ -25,12 +26,18 @@ class Agent {
         int loop_interval_ms);
 
   Agent(const Agent&) = delete;
+
   Agent(Agent&&) = delete;
+
   auto operator=(const Agent&) -> Agent& = delete;
+
   auto operator=(Agent&&) -> Agent& = delete;
+
   ~Agent() = default;
 
-  void Connect(const std::string& server_address);
+  void Connect(const std::string& server_address) {
+    ws_client_->open(server_address.data());
+  }
 
   [[nodiscard]] auto IsConnected() const -> bool {
     return ws_client_->isConnected();
@@ -60,7 +67,7 @@ class Agent {
     return environment_info_.value();
   }
 
-  [[nodiscard]] auto available_buffs() const -> const AvailableBuffs& {
+  [[nodiscard]] auto available_buffs() const -> const std::vector<BuffKind>& {
     return available_buffs_.value();
   }
 
@@ -80,7 +87,7 @@ class Agent {
 
  private:
   void Loop();
-  void OnMessage(std::string_view message);
+  void OnMessage(const Message& message);
 
   std::string token_;
   hv::EventLoopPtr event_loop_;
@@ -91,17 +98,9 @@ class Agent {
   std::optional<PlayerInfo> opponent_info_;
   std::optional<GameStatistics> game_statistics_;
   std::optional<EnvironmentInfo> environment_info_;
-  std::optional<AvailableBuffs> available_buffs_;
+  std::optional<std::vector<BuffKind>> available_buffs_;
 };
 
 }  // namespace thuai8_agent
-
-template <>
-struct std::formatter<thuai8_agent::Agent> : std::formatter<string> {
-  template <class FormatContext>
-  auto format(const thuai8_agent::Agent& object, FormatContext& ctx) const {
-    return format_to(ctx.out(), "Agent[Token: {}]", object.token());
-  }
-};
 
 #endif  // _THUAI8_AGENT_AGENT_HPP_
