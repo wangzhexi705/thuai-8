@@ -16,66 +16,90 @@
 #include <utility>
 
 #include "agent/agent.hpp"
-#include "agent/format.hpp"
 #include "agent/game_statistics.hpp"
 
-extern void SelectBuff(thuai8_agent::Agent& agent);
-extern void Loop(thuai8_agent::Agent& agent);
+extern void SelectBuff(const thuai8_agent::Agent& agent);
+extern void Loop(const thuai8_agent::Agent& agent);
 
 constexpr auto kDefaultServer{"ws://localhost:14514"};
 constexpr auto kDefaultToken{"1919810"};
 constexpr std::uint8_t kDefaultIntervalMs{200};
 
 namespace {
+#ifndef NDEBUG
+auto GetLogLevel(const std::string& level) -> spdlog::level::level_enum {
+  if (level == "1") {
+    return spdlog::level::debug;
+  }
+  if (level == "2") {
+    return spdlog::level::info;
+  }
+  if (level == "3") {
+    return spdlog::level::warn;
+  }
+  if (level == "4") {
+    return spdlog::level::err;
+  }
+  throw std::invalid_argument("Invalid log level '" + level + "'");
+}
+#endif
+
 auto ParseOptions(int argc, char** argv)
     -> std::optional<std::pair<std::string, std::string>> {
   std::string server{kDefaultServer};
   std::string token{kDefaultToken};
 
   // NOLINTBEGIN(concurrency-mt-unsafe)
-  if (auto* env_server{std::getenv("SERVER")}; env_server != nullptr) {
+  if (auto* env_server{std::getenv("SERVER")}) {
     server = env_server;
   }
-  if (auto* env_token{std::getenv("TOKEN")}; env_token != nullptr) {
+  if (auto* env_token{std::getenv("TOKEN")}) {
     token = env_token;
   }
   // NOLINTEND(concurrency-mt-unsafe)
 
   if (argc > 1) {
     cxxopts::Options options{"agent"};
-    options.add_options()("s,server", "Set server_address",
-                          cxxopts::value<std::string>()->default_value(server))(
+    options.add_options()("h,help", "Print usage")(
+        "s,server", "Set server_address",
+        cxxopts::value<std::string>()->default_value(server))(
         "t,token", "Set token",
-        cxxopts::value<std::string>()->default_value(token))("h,help",
-                                                             "Print usage");
-    options.allow_unrecognised_options();
+        cxxopts::value<std::string>()->default_value(token));
+#ifndef NDEBUG
+    options.add_options()("l,log",
+                          "Set log level: 1-debug, 2-info, 3-warn, 4-error",
+                          cxxopts::value<std::string>()->default_value("1"));
+#endif
 
-    auto result{options.parse(argc, argv)};
-
-    if (result.unmatched().size() > 0) {
-      std::print("\033[1;31mUnrecognized options: {}\033[0m",
-                 result.unmatched().front());
+    try {
+      auto result{options.parse(argc, argv)};
+      if (result.count("help") > 0) {
+        std::println("{}", options.help());
+        return std::nullopt;
+      }
+      server = result["server"].as<std::string>();
+      token = result["token"].as<std::string>();
+#ifndef NDEBUG
+      spdlog::set_level(GetLogLevel(result["log"].as<std::string>()));
+#endif
+    } catch (const std::exception& e) {
+      std::print("\033[1;31m{}\033[0m", e.what());
       std::println("{}", options.help());
       return std::nullopt;
     }
-    if (result.count("help") > 0) {
-      std::println("{}", options.help());
-      return std::nullopt;
-    }
-
-    server = result["server"].as<std::string>();
-    token = result["token"].as<std::string>();
   }
+#ifndef NDEBUG
+  else {
+    spdlog::set_level(spdlog::level::debug);
+  }
+#endif
 
   return std::make_pair(server, token);
 }
 }  // namespace
 
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 auto main(int argc, char* argv[]) -> int {
-#ifndef NDEBUG
-  spdlog::set_level(spdlog::level::debug);
-#endif
-
   auto options{ParseOptions(argc, argv)};
   if (!options.has_value()) {
     return 0;
@@ -129,7 +153,6 @@ auto main(int argc, char* argv[]) -> int {
           SelectBuff(agent);
           spdlog::info("{} selected a buff", agent);
           is_buff_selected = true;
-          return;
         } catch (const std::exception& e) {
           spdlog::error("an error occurred in SelectBuff({}): {}", agent,
                         e.what());
@@ -143,27 +166,31 @@ auto main(int argc, char* argv[]) -> int {
     }
 
     if (is_buff_selected) {
+      spdlog::info("{} is in a new battle", agent);
       is_buff_selected = false;
     }
 
+#ifndef NDEBUG
+    auto start{std::chrono::high_resolution_clock::now()};
+#endif
     try {
-#ifndef NDEBUG
-      auto start = std::chrono::high_resolution_clock::now();
-#endif
       Loop(agent);
-#ifndef NDEBUG
-      if (auto end = std::chrono::high_resolution_clock::now();
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-              .count() > kDefaultIntervalMs) {
-        spdlog::warn("{} PlayerLoop overflow {}ms", agent, kDefaultIntervalMs);
-      }
-#endif
     } catch (const std::exception& e) {
       spdlog::error("an error occurred in PlayerLoop({}): {}", agent, e.what());
 #ifdef NDEBUG
       event_loop->stop();
 #endif
     }
+#ifndef NDEBUG
+    auto end{std::chrono::high_resolution_clock::now()};
+    if (auto duration{
+            std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+                .count()};
+        duration > kDefaultIntervalMs) {
+      spdlog::warn("{} PlayerLoop overflow {}ms with {} ms", agent,
+                   kDefaultIntervalMs, duration);
+    }
+#endif
   });
 
   try {
@@ -172,3 +199,4 @@ auto main(int argc, char* argv[]) -> int {
     spdlog::error("an error occurred in EventLoop({}): {}", agent, e.what());
   }
 }
+// NOLINTEND(readability-function-cognitive-complexity)

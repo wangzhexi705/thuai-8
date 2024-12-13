@@ -14,6 +14,7 @@ namespace BattleCity
     {
         private Tank mTanks;
         private Bullet mBullets;
+        private Map CityMap;
 
         private JArray _recordArray;
         private string _recordFile;
@@ -25,6 +26,7 @@ namespace BattleCity
         {
             mTanks = this.GetModel<Tank>();
             mBullets = this.GetModel<Bullet>();
+            CityMap = this.GetModel<Map>();
 
             FileLoaded fileLoaded = GameObject.Find("RecordReader").GetComponent<FileLoaded>();
             _recordFile = fileLoaded.File;
@@ -67,7 +69,7 @@ namespace BattleCity
             {
                 int tankId = tank["tankId"].ToObject<int>();
                 int ammo = tank["ammo"].ToObject<int>();
-                this.SendCommand(new AmmoChangeCommand(tankId, ammo));
+                this.SendCommand(new AmmoChangeCommand(tankId, 0, ammo));
             }
         }
 

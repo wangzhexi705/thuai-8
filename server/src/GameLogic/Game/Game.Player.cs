@@ -3,7 +3,7 @@ using Thuai.Server.GameController;
 
 namespace Thuai.Server.GameLogic;
 
-public partial class Game 
+public partial class Game
 {
 
     #region Fields and properties
@@ -14,10 +14,7 @@ public partial class Game
     /// <summary>
     /// Record the scores of the players.
     /// </summary>
-    /// <remarks>
-    /// The i-th player's score is <see cref="Scoreboard"/>[i]
-    /// </remarks>
-    public List<int> Scoreboard { get; private set; } = [];
+    public Dictionary<Player, int> Scoreboard { get; private set; } = [];
 
     #endregion
 
@@ -26,11 +23,11 @@ public partial class Game
     /// <summary>
     /// Add player in the game.
     /// </summary>
-    /// <param name="player">The player to be added.</param>
+    /// <param name="playerId">The player to be added.</param>
     /// <returns>If the adding succeeds.</returns>
-    public bool AddPlayer(Player player)
+    public bool AddPlayer(string token, int playerId)
     {
-        if (Stage != GameStage.Waiting) 
+        if (Stage != GameStage.Waiting)
         {
             _logger.Error("Cannot add player: The game is already started.");
             return false;
@@ -38,10 +35,14 @@ public partial class Game
 
         try
         {
-            lock(_lock)
+            lock (_lock)
             {
+                Player player = new(token, playerId)
+                {
+                    ID = playerId
+                };
                 AllPlayers.Add(player);
-                Scoreboard.Add(0);
+                Scoreboard.Add(player, 0);
                 // SubscribePlayerEvents(player);
                 return true;
             }
@@ -62,16 +63,9 @@ public partial class Game
     {
         try
         {
-            lock(_lock)
+            lock (_lock)
             {
-                // Is there a fancier way?
-                int index = AllPlayers.FindIndex((Player _player) => {
-                    return _player == player;
-                });
-                if (index != -1)
-                {
-                    Scoreboard.RemoveAt(index);
-                }
+                Scoreboard.Remove(player);
                 AllPlayers.Remove(player);
             }
         }
@@ -82,15 +76,60 @@ public partial class Game
         }
     }
 
-    public void UpdatePlayers()
+    public void addScore(Player player, int score)
     {
-        foreach (Player player in AllPlayers)
+        try
         {
-            // Update the player status.
+            lock (_lock)
+            {
+                Scoreboard[player] += score;
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.Error($"Cannot : {e.Message}");
+            _logger.Debug($"{e}");
         }
     }
 
-
+    /// <summary>
+    /// Get the player with the highest score. Null if more than one players
+    /// have the highest score.
+    /// </summary>
+    /// <returns>The reference of player with the highest score.</returns>
+    /// <exception cref="Exception">Never thrown, unless some error occurs.</exception>
+    public Player? GetHighScorePlayer()
+    {
+        int highScore = -1;
+        Player? highScorePlayer = null;
+        foreach (Player player in AllPlayers)
+        {
+            if (Scoreboard[player] > highScore)
+            {
+                highScore = Scoreboard[player];
+                highScorePlayer = player;
+            }
+        }
+        int highScoreCount = 0;
+        foreach (Player player in AllPlayers)
+        {
+            if (Scoreboard[player] == highScore)
+            {
+                ++highScoreCount;
+            }
+        }
+        if (highScoreCount == 1)
+        {
+            return highScorePlayer;
+        }
+        else if (highScoreCount > 1)
+        {
+            return null;
+        }
+        else
+        {
+            throw new Exception("This should NOT be thrown!");
+        }
+    }
     #endregion
-
 }
