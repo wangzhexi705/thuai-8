@@ -1,26 +1,21 @@
+using Thuai.Server.GameLogic;
+
 namespace Thuai.Server.GameController;
 
 /// <summary>
 /// Runs and manages the game.
 /// </summary>
-public class GameRunner
+public class GameRunner(Utility.Config.GameSettings gameSettings)
 {
+    public Utility.Config.GameSettings GameSettings = gameSettings;
     /// <summary>
-    /// The game controlled by the game runner.
-    /// </summary>
-    public GameLogic.Game CreateGame(Utility.Config.GameSettings gameSettings)
-    {
-        // TODO: Implement
-
-        throw new NotImplementedException();
-    }
-
-    /// <summary>
-    /// Runs an existing game.
+    /// Runs a new game and return the result.
     /// </summary>
     /// <param name="game">The game to be run.</param>
-    public void Run(GameLogic.Game game)
+    public void Run()
     {
+        Game game = new(GameSettings);
+        
         throw new NotImplementedException();
     }
 
